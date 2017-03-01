@@ -1,0 +1,27 @@
+c:\users\kwaghmode\documents\visual studio 2015\Projects\TopCitiesFinder\TopCitiesFinder\bin\Debug\TopCitiesFinder.exe.config
+c:\users\kwaghmode\documents\visual studio 2015\Projects\TopCitiesFinder\TopCitiesFinder\bin\Debug\TopCitiesFinder.exe
+c:\users\kwaghmode\documents\visual studio 2015\Projects\TopCitiesFinder\TopCitiesFinder\bin\Debug\TopCitiesFinder.pdb
+c:\users\kwaghmode\documents\visual studio 2015\Projects\TopCitiesFinder\TopCitiesFinder\bin\Debug\Elasticsearch.Net.dll
+c:\users\kwaghmode\documents\visual studio 2015\Projects\TopCitiesFinder\TopCitiesFinder\bin\Debug\Nest.dll
+c:\users\kwaghmode\documents\visual studio 2015\Projects\TopCitiesFinder\TopCitiesFinder\bin\Debug\Newtonsoft.Json.dll
+c:\users\kwaghmode\documents\visual studio 2015\Projects\TopCitiesFinder\TopCitiesFinder\bin\Debug\Elasticsearch.Net.pdb
+c:\users\kwaghmode\documents\visual studio 2015\Projects\TopCitiesFinder\TopCitiesFinder\bin\Debug\Elasticsearch.Net.xml
+c:\users\kwaghmode\documents\visual studio 2015\Projects\TopCitiesFinder\TopCitiesFinder\bin\Debug\Nest.pdb
+c:\users\kwaghmode\documents\visual studio 2015\Projects\TopCitiesFinder\TopCitiesFinder\bin\Debug\Nest.xml
+c:\users\kwaghmode\documents\visual studio 2015\Projects\TopCitiesFinder\TopCitiesFinder\bin\Debug\Newtonsoft.Json.xml
+c:\users\kwaghmode\documents\visual studio 2015\Projects\TopCitiesFinder\TopCitiesFinder\obj\Debug\TopCitiesFinder.exe
+c:\users\kwaghmode\documents\visual studio 2015\Projects\TopCitiesFinder\TopCitiesFinder\obj\Debug\TopCitiesFinder.pdb
+D:\Code\Platform\New\Tools\TopCitiesFinder\TopCitiesFinder\TopCitiesFinder\bin\Debug\TopCitiesFinder.exe.config
+D:\Code\Platform\New\Tools\TopCitiesFinder\TopCitiesFinder\TopCitiesFinder\obj\Debug\TopCitiesFinder.exe
+D:\Code\Platform\New\Tools\TopCitiesFinder\TopCitiesFinder\TopCitiesFinder\obj\Debug\TopCitiesFinder.pdb
+D:\Code\Platform\New\Tools\TopCitiesFinder\TopCitiesFinder\TopCitiesFinder\bin\Debug\TopCitiesFinder.exe
+D:\Code\Platform\New\Tools\TopCitiesFinder\TopCitiesFinder\TopCitiesFinder\bin\Debug\TopCitiesFinder.pdb
+D:\Code\Platform\New\Tools\TopCitiesFinder\TopCitiesFinder\TopCitiesFinder\bin\Debug\Elasticsearch.Net.dll
+D:\Code\Platform\New\Tools\TopCitiesFinder\TopCitiesFinder\TopCitiesFinder\bin\Debug\Nest.dll
+D:\Code\Platform\New\Tools\TopCitiesFinder\TopCitiesFinder\TopCitiesFinder\bin\Debug\Newtonsoft.Json.dll
+D:\Code\Platform\New\Tools\TopCitiesFinder\TopCitiesFinder\TopCitiesFinder\bin\Debug\Elasticsearch.Net.pdb
+D:\Code\Platform\New\Tools\TopCitiesFinder\TopCitiesFinder\TopCitiesFinder\bin\Debug\Elasticsearch.Net.xml
+D:\Code\Platform\New\Tools\TopCitiesFinder\TopCitiesFinder\TopCitiesFinder\bin\Debug\Nest.pdb
+D:\Code\Platform\New\Tools\TopCitiesFinder\TopCitiesFinder\TopCitiesFinder\bin\Debug\Nest.xml
+D:\Code\Platform\New\Tools\TopCitiesFinder\TopCitiesFinder\TopCitiesFinder\bin\Debug\Newtonsoft.Json.xml
+D:\Code\Platform\New\Tools\TopCitiesFinder\TopCitiesFinder\TopCitiesFinder\obj\Debug\TopCitiesFinder.csprojResolveAssemblyReference.cache
