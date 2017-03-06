@@ -17,36 +17,38 @@ namespace TopCitiesFinder
 {
     class Program
     {
-        private static ConcurrentDictionary<string, List<KeyValuePair<string, string>>> supplierUnmappedHotel = new ConcurrentDictionary<string, List<KeyValuePair<string, string>>>();
+        private static ConcurrentDictionary<string, int> errorCount = new ConcurrentDictionary<string, int>();
         private static object dictLock = new object();
         private static object listLock = new object();
 
         static void Main(string[] args)
         {
-            Stopwatch watch = Stopwatch.StartNew();
-            int numberOfDays = 15;
+            try {
+                Stopwatch watch = Stopwatch.StartNew();
+                int numberOfDays = 2;
 
-            // haveing one slot of 2 hrs
-            var numberOfSlots = numberOfDays * 12;
+                // haveing one slot of 2 hrs
+                var numberOfSlots = numberOfDays * 12;
 
-            var slots = new List<DateTime>();
+                var slots = new List<DateTime>();
 
-            for (int i = 0; i < numberOfSlots; i++)
-            {
-                slots.Add(DateTime.UtcNow.AddHours(-(2 * i)));
-            }
+                for (int i = 0; i < numberOfSlots; i++)
+                {
+                    slots.Add(DateTime.UtcNow.AddHours(-(2 * i)));
+                }
 
-            //foreach (var x in slots)
-            Parallel.ForEach(slots,(x) =>
-            {
+                //foreach (var x in slots)
+                Parallel.ForEach(slots, (x) =>
+                 {
 
-                GetGeoRegionDataBetweenTimeSlots(x, x.AddHours(-2));
-            }
-            );
+                     GetGeoRegionDataBetweenTimeSlots(x.AddHours(-2), x);
+                 }
+                );
 
-            Console.WriteLine($"done! Time taken {watch.ElapsedMilliseconds}");
-            File.WriteAllText("C:/unmappedHotels.txt", JsonConvert.SerializeObject(supplierUnmappedHotel));
-            Console.ReadKey(true);
+                Console.WriteLine($"done! Time taken {watch.ElapsedMilliseconds}");
+                File.WriteAllText("C:/unmappedHotels.txt", JsonConvert.SerializeObject(errorCount));
+                Console.ReadKey(true); }
+            catch (Exception ex) { Console.WriteLine(ex); }
         }
 
         private static void GetGeoRegionDataBetweenTimeSlots(DateTime start, DateTime end)
@@ -70,14 +72,14 @@ namespace TopCitiesFinder
                 int batchSize = 0;
                 QueryContainer query = new TermQuery
                 {
-                    Field = "ApplicationName",
-                    Value = "tavisca.usg.hotels"
+                    Field = "Status",
+                    Value = "failure"
                 };
 
                 query = query && new TermQuery
                 {
                     Field = "CallType",
-                    Value = "supplierhotelmapping.missingvalues"
+                    Value = "ean.raterules.hotelroomavailability"
                 };
 
 
@@ -85,11 +87,9 @@ namespace TopCitiesFinder
                 query = query && new DateRangeQuery
                 {
                     Field = "Timestamp",
-                    LessThan = start,
-                    GreaterThan = end
+                    LessThan = end,
+                    GreaterThan = start
                 };
-
-                //var JSONString = "{\"geoRegion\":{\"circle\":{\"center\":{\"lat\":-33.91975,\"long\":18.42566},\"radiusKm\":15.0}},\"supplierFamilies\":[\"touricotgs\",\"ean\",\"pricelinepn\",\"hotelbeds\"],\"contentPrefs\":[\"Ids\"]}";
 
                 bool moreResults = true;
 
@@ -120,15 +120,7 @@ namespace TopCitiesFinder
 
                                 try
                                 {
-                                    var supplierName = request.AdditionalInfo["ProviderName"];
 
-
-                                    if (!supplierUnmappedHotel.ContainsKey(supplierName))
-                                    {
-                                        lock (supplierName)
-                                            if (!supplierUnmappedHotel.ContainsKey(supplierName))
-                                                supplierUnmappedHotel[supplierName] = new List<KeyValuePair<string, string>>();
-                                    }
                                     var jsonString = webClient.DownloadString(request.Response);
                                     var contentLog = JsonConvert.DeserializeObject<dynamic>(jsonString);
 
@@ -138,36 +130,38 @@ namespace TopCitiesFinder
                                         contentLog = JsonConvert.DeserializeObject<dynamic>(Convert.ToString(contentLog.Body));
                                     }
 
-                                    //var geofilePath = @"C:\logs\" + fileName + "-latlong.txt";
-                                    //File.AppendAllText(geofilePath, request.Id + "," + usgRequest.geoRegion.circle.center.lat.ToString() + "," +
-                                    //    usgRequest.geoRegion.circle.center.@long.ToString() + "\r\n");
-
-
-
                                     foreach (var kvp in contentLog)
                                     {
-                                        if (!supplierUnmappedHotel[supplierName].Any(x => x.Key == kvp.Name))
+                                       
+                                        var supError = kvp.Value.EanWsError.category.Value;
+                                        if (errorCount.ContainsKey(supError))
+                                            errorCount[supError]++;
+                                        else
                                         {
-                                            lock (kvp.Name)
-                                                if (!supplierUnmappedHotel[supplierName].Any(x => x.Key == kvp.Name))
+                                            lock (supError)
+                                            {
+                                                if (!errorCount.ContainsKey(supError))
                                                 {
-                                                    var hname=kvp.Value["HotelInfo"]["Name"].Value;
-                                                    supplierUnmappedHotel[supplierName].Add(new KeyValuePair<string, string>(kvp.Name, hname)); }
+                                                    errorCount[supError] = 1;
+                                                }
+                                                else errorCount[supError]++;
+                                            }
                                         }
 
-                                        //Console.WriteLine(kvp.Name);
                                     }
 
 
                                 }
                                 catch (Exception ex)
                                 {
+                                    Console.WriteLine(ex);
                                     File.AppendAllText(@"C:\Exceptions1.txt", ex.Message + "\r\n");
                                 }
                             }
                         }
                         catch (Exception ex)
                         {
+                            Console.WriteLine(ex);
                             File.AppendAllText(@"C:\Exceptions1.txt", ex.Message + "\r\n");
                         }
                     }
@@ -180,7 +174,7 @@ namespace TopCitiesFinder
             }
             catch (Exception ex)
             {
-
+                Console.WriteLine(ex);
                 File.AppendAllText(@"C:\error.txt", ex.Message);
                 throw;
             }
