@@ -17,13 +17,14 @@ namespace TopCitiesFinder
 {
     class Program
     {
-        private static ConcurrentDictionary<string, int> errorCount = new ConcurrentDictionary<string, int>();
+        private static ConcurrentDictionary<string, List<Criteria>> errorCount = new ConcurrentDictionary<string, List<Criteria>>();
         private static object dictLock = new object();
         private static object listLock = new object();
 
         static void Main(string[] args)
         {
-            try {
+            try
+            {
                 Stopwatch watch = Stopwatch.StartNew();
                 int numberOfDays = 2;
 
@@ -39,15 +40,16 @@ namespace TopCitiesFinder
 
                 //foreach (var x in slots)
                 Parallel.ForEach(slots, (x) =>
-                 {
+                {
 
-                     GetGeoRegionDataBetweenTimeSlots(x.AddHours(-2), x);
-                 }
+                    GetGeoRegionDataBetweenTimeSlots(x.AddHours(-2), x);
+                }
                 );
 
                 Console.WriteLine($"done! Time taken {watch.ElapsedMilliseconds}");
                 File.WriteAllText("C:/unmappedHotels.txt", JsonConvert.SerializeObject(errorCount));
-                Console.ReadKey(true); }
+                Console.ReadKey(true);
+            }
             catch (Exception ex) { Console.WriteLine(ex); }
         }
 
@@ -115,42 +117,43 @@ namespace TopCitiesFinder
                         webClient.Encoding = Encoding.UTF8;
                         try
                         {
-                            foreach (var request in response.Documents)
+                            foreach (var logEntry in response.Documents)
                             {
 
                                 try
                                 {
-
-                                    var jsonString = webClient.DownloadString(request.Response);
-                                    var contentLog = JsonConvert.DeserializeObject<dynamic>(jsonString);
-
-
-                                    if (isBodyPresent(contentLog))
+                                    var jsonStringrq = webClient.DownloadString(logEntry.Request);
+                                    var req = JsonConvert.DeserializeObject<dynamic>(jsonStringrq);
+                                    var parts = req.Url.Value.Split('&');
+                                    Criteria criteria = new Criteria() { rq=jsonStringrq};
+                                    foreach (var part in parts)
                                     {
-                                        contentLog = JsonConvert.DeserializeObject<dynamic>(Convert.ToString(contentLog.Body));
+                                        var x = part.Split('=');
+                                        if (x.Length == 2 && x[0] == "arrivalDate")
+                                            criteria.Checkin = x[1];
+                                        if (x.Length == 2 && x[0] == "departureDate")
+                                            criteria.Checkout = x[1];
+                                        if (x.Length == 2 && x[0] == "hotelId")
+                                            criteria.HotelId = x[1];
                                     }
-
-                                    foreach (var kvp in contentLog)
+                                    var jsonString = webClient.DownloadString(logEntry.Response);
+                                    criteria.rs = jsonString;
+                                    var logResponse = JsonConvert.DeserializeObject<dynamic>(jsonString);
+                                    
+                                    var supError = logResponse.HotelRoomAvailabilityResponse.EanWsError.category.Value;
+                                    if (errorCount.ContainsKey(supError))
+                                        errorCount[supError].Add(criteria);
+                                    else
                                     {
-                                       
-                                        var supError = kvp.Value.EanWsError.category.Value;
-                                        if (errorCount.ContainsKey(supError))
-                                            errorCount[supError]++;
-                                        else
+                                        lock (supError)
                                         {
-                                            lock (supError)
+                                            if (!errorCount.ContainsKey(supError))
                                             {
-                                                if (!errorCount.ContainsKey(supError))
-                                                {
-                                                    errorCount[supError] = 1;
-                                                }
-                                                else errorCount[supError]++;
+                                                errorCount[supError] = new List<Criteria>() { criteria };
                                             }
+                                            else errorCount[supError].Add(criteria);
                                         }
-
                                     }
-
-
                                 }
                                 catch (Exception ex)
                                 {
@@ -206,5 +209,16 @@ namespace TopCitiesFinder
         public String Id { get; set; }
         public DateTime TimeStamp { get; set; }
         public Dictionary<string, string> AdditionalInfo { get; set; }
+        public string Request { get; set; }
+    }
+
+    class Criteria
+    {
+        public string Checkin { get; set; }
+        public string Checkout { get; set; }
+        public string HotelId { get; set; }
+
+        public string rq { get; set; }
+        public string rs { get; set; }
     }
 }
