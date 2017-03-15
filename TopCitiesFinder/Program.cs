@@ -19,19 +19,32 @@ namespace TopCitiesFinder
 {
     class Program
     {
-        private static List<KeyValuePair<string, string>> tokens = new List<KeyValuePair<string, string>>();
+        private static ConcurrentBag<KeyValuePair<string, string>> result = new ConcurrentBag<KeyValuePair<string, string>>();
         private static object dictLock = new object();
         private static object listLock = new object();
+
+
+        private static int numberOfDays = 2;
+        private static string elasticUri = "http://private-elasticsearch.stage.oski.io:9200/";
+        //note: keys are case sensitive, values are not
+        private static List<KeyValuePair<string, string>> Queries = new List<KeyValuePair<string, string>>() {
+            new KeyValuePair<string, string>("AdditionalInfo.corelation-id","43058698-7c30-4520-b8b1-a1cae0e73c9b"),
+            new KeyValuePair<string, string>("CallType", "usgsearchresults")
+        };
+        private static string reqRegex = @"(?:token=)\w+";
+        private static string resRegex = "\"nextToken\":\"\\w+\"";
+
+
 
         static void Main(string[] args)
         {
             try
             {
                 Stopwatch watch = Stopwatch.StartNew();
-                // int numberOfDays = 2;
+                int numberOfDays = 2;
 
                 // haveing one slot of 2 hrs
-                var numberOfSlots = 2;// numberOfDays * 12;
+                var numberOfSlots = numberOfDays * 12;
 
                 var slots = new List<DateTime>();
 
@@ -40,29 +53,29 @@ namespace TopCitiesFinder
                     slots.Add(DateTime.UtcNow.AddHours(-(2 * i)));
                 }
 
-                foreach (var x in slots)
-                //Parallel.ForEach(slots, (x) =>
+                //foreach (var x in slots)
+                Parallel.ForEach(slots, (x) =>
                 {
 
-                    GetGeoRegionDataBetweenTimeSlots(x.AddHours(-2), x);
+                    ProcessLogs(x.AddHours(-2), x);
                 }
-                //);
+                );
 
                 Console.WriteLine($"done! Time taken {watch.ElapsedMilliseconds}");
-                //File.WriteAllText("C:/unmappedHotels.txt", JsonConvert.SerializeObject(errorCount));
+                File.WriteAllText("C:/results.txt", JsonConvert.SerializeObject(result));
                 Console.ReadKey(true);
             }
             catch (Exception ex) { Console.WriteLine(ex); }
         }
 
-        private static void GetGeoRegionDataBetweenTimeSlots(DateTime start, DateTime end)
+        private static void ProcessLogs(DateTime start, DateTime end)
         {
 
             try
             {
                 var fileName = start.ToString("yyyy-MM-dd-HH-mm", CultureInfo.InvariantCulture);
 
-                var node = new Uri("http://private-elasticsearch.stage.oski.io:9200/");
+                var node = new Uri(elasticUri);
 
                 var settings = new ConnectionSettings(
                     node
@@ -74,26 +87,23 @@ namespace TopCitiesFinder
 
                 int count = 0;
                 int batchSize = 0;
-                QueryContainer query = new MatchQuery
-                {
-                    Field = "AdditionalInfo.corelation-id",
-                    Query = "bd8c04f3-d4da-4ea2-9007-6a525b3a8582"
-                };
-
-                query = query && new TermQuery
-                {
-                    Field = "CallType",
-                    Value = "usgsearchresults"
-                };
-
-
-
-                query = query && new DateRangeQuery
+                QueryContainer query = new DateRangeQuery
                 {
                     Field = "Timestamp",
                     LessThan = end,
                     GreaterThan = start
                 };
+
+                foreach (var queryParameter in Queries)
+                {
+                    query = query && new MatchQuery
+                    {
+                        Field = queryParameter.Key,
+                        Query = queryParameter.Value.ToLower()
+                    };
+                }
+
+
 
                 bool moreResults = true;
 
@@ -106,33 +116,32 @@ namespace TopCitiesFinder
                         Query = query
                     };
                     count = count + 200;
-                    var response = client.Search<Log>(searchRequest);
-                    Console.WriteLine(fileName + "-" + response.Documents.Count);
+                    var logsData = client.Search<Log>(searchRequest);
+                    Console.WriteLine(fileName + "-" + logsData.Documents.Count);
 
-                    if (response.Documents.Count == 0)
+                    if (logsData.Documents.Count == 0)
                         moreResults = false;
                     else
-                        batchSize = batchSize + response.Documents.Count;
+                        batchSize = batchSize + logsData.Documents.Count;
 
                     using (var webClient = new WebClient())
                     {
                         webClient.Encoding = Encoding.UTF8;
                         try
                         {
-                            foreach (var logEntry in response.Documents)
+                            foreach (var logEntry in logsData.Documents)
                             {
 
                                 try
                                 {
-                                    var jsonStringrq = webClient.DownloadString(logEntry.Request);
+                                    var reqString = webClient.DownloadString(logEntry.Request);
 
-                                    var jsonString = webClient.DownloadString(logEntry.Response);
-                                    //var logResponse = JsonConvert.DeserializeObject<dynamic>(jsonString);
+                                    var resString = webClient.DownloadString(logEntry.Response);
 
-                                    var rqToken = GetQueryStringParameter(jsonStringrq, "token");
-                                    var rstoken =  Regex.Matches(jsonString, "\"nextToken\":\"\\w+\"").Cast<Match>().FirstOrDefault();
-                                    
-                                    tokens.Add(new KeyValuePair<string, string>(rqToken,rstoken?.Value));
+                                    var rqToken = Regex.Matches(reqString, reqRegex).Cast<Match>().FirstOrDefault();
+                                    var rstoken = Regex.Matches(resString, resRegex).Cast<Match>().FirstOrDefault();
+
+                                    result.Add(new KeyValuePair<string, string>(rqToken?.Value, rstoken?.Value));
                                 }
                                 catch (Exception ex)
                                 {
@@ -148,11 +157,8 @@ namespace TopCitiesFinder
                         }
                     }
 
-                    var infofilePath = @"C:\logs\" + fileName + "-info.txt";
-                    File.WriteAllText("res.txt", JsonConvert.SerializeObject(tokens));
-                    //File.AppendAllText(infofilePath, "Count=" + batchSize + "\r\n");
+                    //var infofilePath = @"C:\logs\" + fileName + "-info.txt";
                 }
-
 
             }
             catch (Exception ex)
