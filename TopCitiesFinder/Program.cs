@@ -11,13 +11,15 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+
 
 namespace TopCitiesFinder
 {
     class Program
     {
-        private static ConcurrentDictionary<string, List<Criteria>> errorCount = new ConcurrentDictionary<string, List<Criteria>>();
+        private static List<KeyValuePair<string, string>> tokens = new List<KeyValuePair<string, string>>();
         private static object dictLock = new object();
         private static object listLock = new object();
 
@@ -26,10 +28,10 @@ namespace TopCitiesFinder
             try
             {
                 Stopwatch watch = Stopwatch.StartNew();
-                int numberOfDays = 2;
+                // int numberOfDays = 2;
 
                 // haveing one slot of 2 hrs
-                var numberOfSlots = numberOfDays * 12;
+                var numberOfSlots = 2;// numberOfDays * 12;
 
                 var slots = new List<DateTime>();
 
@@ -38,16 +40,16 @@ namespace TopCitiesFinder
                     slots.Add(DateTime.UtcNow.AddHours(-(2 * i)));
                 }
 
-                //foreach (var x in slots)
-                Parallel.ForEach(slots, (x) =>
+                foreach (var x in slots)
+                //Parallel.ForEach(slots, (x) =>
                 {
 
                     GetGeoRegionDataBetweenTimeSlots(x.AddHours(-2), x);
                 }
-                );
+                //);
 
                 Console.WriteLine($"done! Time taken {watch.ElapsedMilliseconds}");
-                File.WriteAllText("C:/unmappedHotels.txt", JsonConvert.SerializeObject(errorCount));
+                //File.WriteAllText("C:/unmappedHotels.txt", JsonConvert.SerializeObject(errorCount));
                 Console.ReadKey(true);
             }
             catch (Exception ex) { Console.WriteLine(ex); }
@@ -60,7 +62,7 @@ namespace TopCitiesFinder
             {
                 var fileName = start.ToString("yyyy-MM-dd-HH-mm", CultureInfo.InvariantCulture);
 
-                var node = new Uri("http://private-elasticsearch.oski.io:9200/");
+                var node = new Uri("http://private-elasticsearch.stage.oski.io:9200/");
 
                 var settings = new ConnectionSettings(
                     node
@@ -72,16 +74,16 @@ namespace TopCitiesFinder
 
                 int count = 0;
                 int batchSize = 0;
-                QueryContainer query = new TermQuery
+                QueryContainer query = new MatchQuery
                 {
-                    Field = "Status",
-                    Value = "failure"
+                    Field = "AdditionalInfo.corelation-id",
+                    Query = "bd8c04f3-d4da-4ea2-9007-6a525b3a8582"
                 };
 
                 query = query && new TermQuery
                 {
                     Field = "CallType",
-                    Value = "ean.raterules.hotelroomavailability"
+                    Value = "usgsearchresults"
                 };
 
 
@@ -123,37 +125,14 @@ namespace TopCitiesFinder
                                 try
                                 {
                                     var jsonStringrq = webClient.DownloadString(logEntry.Request);
-                                    var req = JsonConvert.DeserializeObject<dynamic>(jsonStringrq);
-                                    var parts = req.Url.Value.Split('&');
-                                    Criteria criteria = new Criteria() { rq=jsonStringrq};
-                                    foreach (var part in parts)
-                                    {
-                                        var x = part.Split('=');
-                                        if (x.Length == 2 && x[0] == "arrivalDate")
-                                            criteria.Checkin = x[1];
-                                        if (x.Length == 2 && x[0] == "departureDate")
-                                            criteria.Checkout = x[1];
-                                        if (x.Length == 2 && x[0] == "hotelId")
-                                            criteria.HotelId = x[1];
-                                    }
+
                                     var jsonString = webClient.DownloadString(logEntry.Response);
-                                    criteria.rs = jsonString;
-                                    var logResponse = JsonConvert.DeserializeObject<dynamic>(jsonString);
+                                    //var logResponse = JsonConvert.DeserializeObject<dynamic>(jsonString);
+
+                                    var rqToken = GetQueryStringParameter(jsonStringrq, "token");
+                                    var rstoken =  Regex.Matches(jsonString, "\"nextToken\":\"\\w+\"").Cast<Match>().FirstOrDefault();
                                     
-                                    var supError = logResponse.HotelRoomAvailabilityResponse.EanWsError.category.Value;
-                                    if (errorCount.ContainsKey(supError))
-                                        errorCount[supError].Add(criteria);
-                                    else
-                                    {
-                                        lock (supError)
-                                        {
-                                            if (!errorCount.ContainsKey(supError))
-                                            {
-                                                errorCount[supError] = new List<Criteria>() { criteria };
-                                            }
-                                            else errorCount[supError].Add(criteria);
-                                        }
-                                    }
+                                    tokens.Add(new KeyValuePair<string, string>(rqToken,rstoken?.Value));
                                 }
                                 catch (Exception ex)
                                 {
@@ -170,6 +149,7 @@ namespace TopCitiesFinder
                     }
 
                     var infofilePath = @"C:\logs\" + fileName + "-info.txt";
+                    File.WriteAllText("res.txt", JsonConvert.SerializeObject(tokens));
                     //File.AppendAllText(infofilePath, "Count=" + batchSize + "\r\n");
                 }
 
@@ -182,6 +162,23 @@ namespace TopCitiesFinder
                 throw;
             }
 
+        }
+
+        private static string GetQueryStringParameter(string url, string parameter)
+        {
+            if (!url.Contains(parameter))
+                return "null";
+            else
+            {
+                var parts = url.Split(new char[] { '?', '&' });
+                foreach (var part in parts)
+                {
+                    var kv = part.Split('=');
+                    if (kv.Length == 2 && kv[0] == parameter)
+                        return kv[1];
+                }
+            }
+            return "null";
         }
 
         private static bool isBodyPresent(dynamic usgRequest)
